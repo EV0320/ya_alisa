@@ -7,6 +7,7 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
 sessionStorage = {}
+sessionKrolik = {}
 
 
 @app.route('/post', methods=['POST'])
@@ -38,7 +39,8 @@ def handle_dialog(req, res):
                 "Отстань!",
             ]
         }
-        res['response']['text'] = 'Привет! Купи слона!'
+        sessionKrolik[user_id] = 'слона'
+        res['response']['text'] = f'Привет! Купи {sessionKrolik[user_id]}!'
         res['response']['buttons'] = get_suggests(user_id)
         return
 
@@ -50,12 +52,15 @@ def handle_dialog(req, res):
         'я покупаю',
         'я куплю'
     ]:
-        res['response']['text'] = 'Слона можно найти на Яндекс.Маркете!'
-        res['response']['end_session'] = True
-        return
+        res['response']['text'] = f'{sessionKrolik[user_id]} можно найти на Яндекс.Маркете!'
+        if sessionKrolik[user_id] == 'слона':
+            sessionKrolik[user_id] = 'кролика'
+        elif sessionKrolik[user_id] == 'кролика':
+            res['response']['end_session'] = True
+            return
 
     res['response']['text'] = \
-        f"Все говорят '{req['request']['original_utterance']}', а ты купи слона!"
+        f"Все говорят '{req['request']['original_utterance']}', а ты купи {sessionKrolik[user_id]}!"
     res['response']['buttons'] = get_suggests(user_id)
 
 
