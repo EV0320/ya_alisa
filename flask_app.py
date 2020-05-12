@@ -1,32 +1,11 @@
-from os import environ
 import logging
 import json
-
 from flask import Flask, request
-
 import requests
 import math
 
 
-def get_coordinates(city_name):
-    try:
-        url = "https://geocode-maps.yandex.ru/1.x/"
-        params = {
-            "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
-            'geocode': city_name,
-            'format': 'json'
-        }
-        response = requests.get(url, params)
-        json = response.json()
-        coordinates_str = json['response']['GeoObjectCollection'][
-            'featureMember'][0]['GeoObject']['Point']['pos']
-        long, lat = map(float, coordinates_str.split())
-        return long, lat
-    except Exception as e:
-        return e
-
-
-def get_country(city_name):
+def get_geo_info(city_name: str, type_info: str):
     try:
         url = "https://geocode-maps.yandex.ru/1.x/"
         params = {
@@ -35,9 +14,12 @@ def get_country(city_name):
             'format': 'json'
         }
         data = requests.get(url, params).json()
-        return data['response']['GeoObjectCollection'][
-            'featureMember'][0]['GeoObject']['metaDataProperty'][
-            'GeocoderMetaData']['AddressDetails']['Country']['CountryName']
+        if type_info == 'country':
+            return data['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['metaDataProperty'][
+                'GeocoderMetaData']['AddressDetails']['Country']['CountryName']
+        elif type_info == 'coordinates':
+            coordinates_str = data['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['Point']['pos']
+            return tuple(map(float, coordinates_str.split()))
     except Exception as e:
         return e
 
@@ -91,13 +73,10 @@ def handle_dialog(res, req):
     if not cities:
         res['response']['text'] = 'Ты не написал название не одного города!'
     elif len(cities) == 1:
-        res['response']['text'] = 'Этот город в стране - ' + \
-                                  get_country(cities[0])
+        res['response']['text'] = 'Этот город в стране - ' + get_geo_info(cities[0], 'country')
     elif len(cities) == 2:
-        distance = get_distance(get_coordinates(
-            cities[0]), get_coordinates(cities[1]))
-        res['response']['text'] = 'Расстояние между этими городами: ' + \
-                                  str(round(distance)) + ' км.'
+        distance = get_distance(get_geo_info(cities[0], 'coordinates'), get_geo_info(cities[1], 'coordinates'))
+        res['response']['text'] = 'Расстояние между этими городами: ' + str(round(distance)) + ' км.'
     else:
         res['response']['text'] = 'Слишком много городов!'
 
@@ -112,4 +91,4 @@ def get_cities(req):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(environ.get("PORT", 5000)))
+    app.run()
