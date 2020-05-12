@@ -75,9 +75,10 @@ def handle_dialog(res, req):
         city = sessionStorage[user_id]['country']
         country = get_geo_info(city, 'country')
         if get_country(req) == country:
-            res['response']['text'] = 'Правильно! Хотите сыграть ещё раз?'
+            res['response']['text'] = f'Правильно, {sessionStorage[user_id]["first_name"]}! Хотите сыграть ещё раз?'
         else:
-            res['response']['text'] = f'Неверно, {city} находится в {country}. Хотите сыграть ещё раз?'
+            res['response']['text'] = f'Неверно, {sessionStorage[user_id]["first_name"]}, {city} находится в {country}.' \
+                f' Хотите сыграть ещё раз?'
         res['response']['buttons'].extend(
             [
                 {
@@ -105,7 +106,7 @@ def handle_dialog(res, req):
         if first_name is None:
             res['response']['text'] = 'Не расслышала имя. Повтори, пожалуйста!'
         else:
-            sessionStorage[user_id]['first_name'] = first_name
+            sessionStorage[user_id]['first_name'] = first_name.title()
             sessionStorage[user_id]['guessed_cities'] = []
             res['response']['text'] = f'Приятно познакомиться, {first_name.title()}. Я Алиса. Отгадаешь город по фото?'
             res['response']['buttons'].append(
