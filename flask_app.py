@@ -2,6 +2,7 @@ from flask import Flask, request
 import logging
 import json
 import random
+import requests
 
 app = Flask(__name__)
 
@@ -17,6 +18,31 @@ cities = {
 }
 
 sessionStorage = {}
+
+
+def get_country(req):
+    for entity in req['request']['nlu']['entities']:
+        if entity['type'] == 'YANDEX.GEO':
+            return entity['value'].get('country', None)
+
+
+def get_geo_info(city_name, type_info):
+    try:
+        url = "https://geocode-maps.yandex.ru/1.x/"
+        params = {
+            "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+            'geocode': city_name,
+            'format': 'json'
+        }
+        data = requests.get(url, params).json()
+        if type_info == 'country':
+            return data['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['metaDataProperty'][
+                'GeocoderMetaData']['AddressDetails']['Country']['CountryName']
+        elif type_info == 'coordinates':
+            coordinates_str = data['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['Point']['pos']
+            return tuple(map(float, coordinates_str.split()))
+    except Exception as e:
+        return e
 
 
 @app.route('/post', methods=['POST'])
@@ -41,8 +67,35 @@ def handle_dialog(res, req):
         res['response']['text'] = 'Привет! Назови своё имя!'
         sessionStorage[user_id] = {
             'first_name': None,
-            'game_started': False
+            'game_started': False,
+            'county': None
         }
+        return
+    if sessionStorage[user_id]['country'] is not None:
+        city = sessionStorage[user_id]['country']
+        country = get_geo_info(city, 'country')
+        if get_country(req) == country:
+            res['response']['text'] = 'Правильно! Хотите сыграть ещё раз?'
+        else:
+            res['response']['text'] = f'Неверно, {city} находится в {country}. Хотите сыграть ещё раз?'
+        res['response']['buttons'].extend(
+            [
+                {
+                    'title': 'Да',
+                    'hide': True
+                },
+                {
+                    'title': 'Нет',
+                    'hide': True
+                },
+                {
+                    'title': 'Покажи город на карте',
+                    'url': f'https://yandex.ru/maps/?mode=search&text={city}',
+                    'hide': True
+                }
+            ]
+        )
+        sessionStorage[user_id]['country'] = None
         return
     if 'помощь' in req['request']['nlu']['tokens']:
         res['response']['text'] = 'Я показываю вам фото, а вы угадываете, какая это страна.'
@@ -110,7 +163,7 @@ def play_game(res, req):
     else:
         city = sessionStorage[user_id]['city']
         if get_city(req) == city:
-            res['response']['text'] = 'Правильно! Сыграем ещё?'
+            res['response']['text'] = 'Правильно! А в какой стране это находится?'
             sessionStorage[user_id]['guessed_cities'].append(city)
             sessionStorage[user_id]['game_started'] = False
             sessionStorage[user_id]['game_started'] = False
@@ -129,6 +182,7 @@ def play_game(res, req):
                         'url': f'https://yandex.ru/maps/?mode=search&text={city}',
                         'hide': True
                     }])
+            sessionStorage[user_id]['country'] = city
             return
         else:
             if attempt > len(cities[city]):
@@ -150,6 +204,7 @@ def play_game(res, req):
                             'url': f'https://yandex.ru/maps/?mode=search&text={city}',
                             'hide': True
                         }])
+                sessionStorage[user_id]['country'] = city
                 return
             else:
                 res['response']['card'] = {}
